@@ -1,0 +1,56 @@
+name: Build and Push Agentic Sandbox
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows you to trigger the build manually from the GitHub UI
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/agentic-sandbox
+
+jobs:
+  build-and-push:
+    name: Native Podman Build and Push
+    runs-on: ubuntu-latest
+    
+    # Required to authenticate to GitHub Packages (GHCR) securely
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # OCI registries (like GHCR) strictly require lowercase repository names.
+      # This bash step converts your GitHub username/repo to lowercase just in case.
+      - name: Lowercase the Image Name
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      - name: Build Image using native Podman
+        run: |
+          # We tag the image with both "latest" and the specific git commit SHA
+          podman build \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -f Containerfile .
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        run: |
+          # The GITHUB_TOKEN is securely and automatically provided by the workflow
+          podman login ${{ env.REGISTRY }} \
+            -u ${{ github.actor }} \
+            -p ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Image to GHCR
+        run: |
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          podman push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          
+      - name: Print resulting image info
+        run: |
+          echo "✅ Image successfully built and pushed!"
+          echo "📦 Pull command: podman pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
