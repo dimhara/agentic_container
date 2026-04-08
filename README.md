@@ -13,7 +13,7 @@ podman run -d --rm --name llm-server \
   --device /dev/dri \
   -v /path/to/your/models:/models:ro \
   ghcr.io/your-username/llama-vulkan-server:latest \
-  llama-server -m /models/qwen3.5-moe.gguf --host 0.0.0.0 --port 8080
+  llama-server -m /models/qwen3.5-moe.gguf --host 0.0.0.0 --port 8080 --jinja
 ```
 
 
