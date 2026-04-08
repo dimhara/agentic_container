@@ -12,7 +12,7 @@ podman run -d --rm --name llm-server \
   --network ai-net \
   --device /dev/dri \
   -v /path/to/your/models:/models:ro \
-  ghcr.io/your-username/llama-vulkan-server:latest \
+  ghcr.io/dimhara/llama-vulkan-server:latest \
   llama-server -m /models/qwen3.5-moe.gguf --host 0.0.0.0 --port 8080 --jinja
 ```
 
@@ -23,7 +23,7 @@ podman run -it --rm --name agent-sandbox \
   --network ai-net \
   -e OPENAI_API_BASE=http://llm-server:8080/v1 \
   -e OPENAI_API_KEY=sk-no-key-required \
-  ghcr.io/your-username/agentic-sandbox:latest
+  ghcr.io/dimhara/agentic-sandbox:latest
 ```
 
 
