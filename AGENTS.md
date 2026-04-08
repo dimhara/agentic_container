@@ -4,71 +4,57 @@
 If you are reading this file, you have been tasked with maintaining, updating, or debugging this repository. This document outlines the strict architectural, security, and design principles of this project. **You must adhere to these rules when generating new code or suggesting changes.**
 
 ## 🎯 Project Purpose
-This repository builds and deploys an ultra-secure, highly optimized container sandbox for running Agentic LLMs (like `aider` and `opencode`) alongside local inference (`llama.cpp` with Vulkan acceleration). 
+This repository builds and deploys an ultra-secure, decoupled container architecture for running Agentic LLMs (like `aider` and `opencode`) against local inference (`llama.cpp` with Vulkan acceleration). 
 
-Because AI agents write and execute arbitrary code, the build and run environments are treated as **highly hostile**. 
+Because AI agents write and execute arbitrary code, the build and run environments are treated as **highly hostile**. To mitigate risks, the project is strictly divided into two containers:
+1. **The Inference Server:** Holds the GPU access and serves an OpenAI-compatible API.
+2. **The Agent Sandbox:** A completely unprivileged, isolated environment with no hardware access.
 
 ---
 
 ## 🛡️ Security & Supply Chain Directives
 When updating dependencies or build scripts, you must maintain the following security measures:
 
-1. **Host Isolation via Rootless Podman:**
-   - We use Podman instead of Docker. Podman's daemonless architecture and user namespaces provide rootless isolation *during the build phase*. If a compromised package attempts a supply chain attack during installation, it is trapped inside the transient build container's unprivileged namespace.
+1. **Decoupled Least Privilege (Hardware Isolation):**
+   - The agent sandbox container must **never** require `--device /dev/dri`. GPU access is strictly limited to the `llama-server` container.
+   - The agent sandbox runs entirely as an unprivileged `agent` user.
+
+2. **Host Isolation via Rootless Podman:**
+   - We use Podman instead of Docker for user namespaces and rootless isolation *during the build phase*.
    - **Do not** introduce instructions that require root access on the host or assume a Docker daemon is running.
 
-2. **The 7-Day Zero-Day Defense (`uv`):**
-   - We use `uv` (by Astral) instead of `pip` for all Python dependencies.
+3. **The 7-Day Zero-Day Defense (`uv`):**
+   - We use `uv` (by Astral) instead of `pip` for Python dependencies in the agent container.
    - **CRITICAL:** We enforce a dynamic 7-day release-age constraint during the build step using `uv pip install --exclude-newer "$CUTOFF_DATE"`. 
-   - This physically prevents the build pipeline from pulling compromised dependencies (zero-day supply chain attacks) published to PyPI within the last week. 
    - **Do not remove this flag.** If a new package version is requested, wait 7 days.
 
-3. **No Node.js / NPM / Bun:**
-   - Although OpenCode is distributed via npm/bun, we **do not** use JavaScript package managers. OpenCode is fundamentally a compiled Go binary.
-   - We use the standalone bash installation script (`curl | bash`) to download the Go binary directly. This prevents adding 100MB+ of Node/JS runtime bloat to the final image.
-
-4. **Least Privilege Runtime:**
-   - The final stage of the `Containerfile` creates and switches to an unprivileged `agent` user.
-   - **Do not** leave the final image running as `root`.
+4. **No Node.js / NPM / Bun / Python C++ Wrappers:**
+   - We **do not** use JavaScript package managers. OpenCode is installed via its standalone bash script (`curl | bash`).
+   - We **do not** use `llama-cpp-python`. We rely exclusively on the native C++ `llama-server` binary for inference.
 
 ---
 
-## 🏗️ Architecture: Multi-Stage Build constraints
-The `Containerfile` relies on a strict two-stage process to keep the final image tiny while supporting heavy C++ GPU compilation.
+## 🏗️ Architecture constraints
+We use two separate build files:
 
-* **STAGE 1 (Builder):**
-  - Installs massive dependencies: GCC, Clang, CMake, Vulkan SDKs.
-  - Compiles `llama.cpp` from source with `-DGGML_VULKAN=ON`.
-  - Sets up the `uv` virtual environment and downloads Python packages.
-* **STAGE 2 (Final Sandbox):**
-  - Uses a minimal Python base image.
-  - Installs *only* the lightweight Vulkan runtime drivers (`libvulkan1`), not the SDK.
-  - Copies *only* the compiled binaries (`/usr/local/bin/llama-*`) and the `/opt/venv` folder from Stage 1.
-  - **Rule:** Never install build tools (like `build-essential` or `cmake`) in Stage 2.
+* **`Containerfile.server`:**
+  - **Builder Stage:** Installs heavy C++ tools, Vulkan SDKs, and compiles `llama.cpp`.
+  - **Final Stage:** Contains ONLY the `llama-server` binary and runtime Vulkan drivers. No Python needed.
+* **`Containerfile.agent`:**
+  - **Builder Stage:** Uses `uv` to install `aider-chat` safely.
+  - **Final Stage:** Minimal Python image. Copies the `uv` venv, installs `opencode`, and creates the `agent` user. Contains zero Vulkan or compilation tools.
 
 ---
 
 ## 🚀 CI/CD Constraints (GitHub Actions)
 - The pipeline uses standard GitHub-hosted `ubuntu-latest` runners. 
-- **Note on GPUs:** The CI runner does *not* need a GPU to compile Vulkan support; it only needs the Vulkan headers/SDK. 
-- To minimize CI/CD supply chain risks, we prefer using the native, pre-installed `podman` CLI commands in bash scripts over third-party GitHub Actions, authenticating natively via the transient `GITHUB_TOKEN`.
-
----
-
-## 💻 Local Runtime Instructions (Context)
-When generating documentation or run commands for the human user, remember that the container requires hardware access for Vulkan acceleration. 
-
-The standard run command must map the GPU devices and execute rootless:
-```bash
-podman run -it --rm \
-  --device /dev/dri \
-  ghcr.io/OWNER/agentic-sandbox:latest
-```
+- To minimize CI/CD supply chain risks, we use native `podman` CLI commands in bash scripts to build and push both images, authenticating via the transient `GITHUB_TOKEN`.
 
 ## ✅ Maintenance Checklist for Future LLMs:
+- [ ] Is the architecture maintained strictly as two separate containers?
+- [ ] Did you avoid introducing `llama-cpp-python`?
 - [ ] Did you use `uv` instead of `pip`?
 - [ ] Is the `--exclude-newer` 7-day cutoff still intact?
-- [ ] Are new C++ dependencies kept strictly in the `builder` stage?
-- [ ] Is the final container running as the `agent` user?
+- [ ] Is the agent container running as the `agent` user?
 - [ ] Did you avoid introducing `node`, `npm`, or `bun`?
 

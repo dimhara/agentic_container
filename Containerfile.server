@@ -1,0 +1,33 @@
+# ==========================================
+# STAGE 1: Builder (Heavy C++ dependencies)
+# ==========================================
+FROM python:3.12-slim AS builder
+
+# Install heavy C++ compilers, Vulkan SDKs, and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git curl ca-certificates \
+    libvulkan-dev glslc
+
+# Build llama.cpp with Vulkan support
+WORKDIR /build
+RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git . && \
+    cmake -B build -DGGML_VULKAN=ON && \
+    cmake --build build --config Release -j$(nproc)
+
+# ==========================================
+# STAGE 2: Final Inference Server
+# ==========================================
+FROM python:3.12-slim
+
+# Install ONLY runtime Vulkan drivers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libvulkan1 vulkan-tools ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy over ONLY the compiled llama-server binary
+COPY --from=builder /build/build/bin/llama-server /usr/local/bin/
+
+# Default exposed port for OpenAI-compatible API
+EXPOSE 8080
+
+CMD ["llama-server"]
