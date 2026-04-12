@@ -21,7 +21,7 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git . && \
 FROM debian:testing-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libvulkan1 vulkan-tools ca-certificates libgomp1 && \
+    libvulkan1 vulkan-tools ca-certificates libgomp1 rocminfo mesa-vulkan-drivers less nano && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the entire staged installation (contains bin/, lib/, etc.)

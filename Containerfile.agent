@@ -19,7 +19,7 @@ RUN export CUTOFF_DATE=$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ') && \
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates git && \
+    curl ca-certificates git less nano && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
