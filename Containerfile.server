@@ -5,7 +5,7 @@ FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git curl ca-certificates \
-    libvulkan-dev glslc
+    libvulkan-dev glslc python3
 
 # Build llama.cpp with Vulkan support and install to a staging directory
 WORKDIR /build
