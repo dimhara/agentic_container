@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Builder (Heavy C++ dependencies)
 # ==========================================
-FROM debian:bookworm-slim AS builder
+FROM debian:testing-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git curl ca-certificates \
@@ -18,7 +18,7 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git . && \
 # ==========================================
 # STAGE 2: Final Inference Server (No Python!)
 # ==========================================
-FROM debian:bookworm-slim
+FROM debian:testing-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan1 vulkan-tools ca-certificates && \
