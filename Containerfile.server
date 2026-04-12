@@ -1,19 +1,19 @@
 # ==========================================
 # STAGE 1: Builder (Heavy C++ dependencies)
 # ==========================================
-FROM python:3.12-slim AS builder
+FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git curl ca-certificates \
     libvulkan-dev glslc
 
-# Build llama.cpp with Vulkan support and new ggml-org repo
+# Build llama.cpp with Vulkan support and install to a staging directory
 WORKDIR /build
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git . && \
-    cmake -B build -DGGML_VULKAN=ON && \
+    # Define an install prefix to cleanly gather binaries AND shared libs
+    cmake -B build -DGGML_VULKAN=ON -DCMAKE_INSTALL_PREFIX=/opt/llama && \
     cmake --build build --config Release -j$(nproc) && \
-
-    strip /build/build/bin/llama-server
+    cmake --install build
 
 # ==========================================
 # STAGE 2: Final Inference Server (No Python!)
@@ -24,7 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan1 vulkan-tools ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/build/bin/llama-server /usr/local/bin/
+# Copy the entire staged installation (contains bin/, lib/, etc.)
+COPY --from=builder /opt/llama/ /usr/local/
+
+# Update linker cache so the OS knows where to find libggml.so and libllama.so
+RUN ldconfig
 
 EXPOSE 8080
 CMD ["llama-server"]
