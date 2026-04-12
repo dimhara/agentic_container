@@ -23,14 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install OpenCode and force-clear any temporary download artifacts
-RUN curl -fsSL https://opencode.ai/install | bash && \
-    rm -rf /tmp/* /var/tmp/*
 
 RUN useradd -m -s /bin/bash agent
 USER agent
 WORKDIR /home/agent
+
+ENV PATH="/home/agent/.local/bin:/home/agent/.opencode/bin:/opt/venv/bin:$PATH"
+
+RUN curl -fsSL https://opencode.ai/install | bash
 
 CMD ["/bin/bash"]
