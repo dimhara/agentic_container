@@ -2,34 +2,59 @@
 # STAGE 1: Builder (Python Dependencies)
 # ==========================================
 FROM python:3.12-slim AS builder
-
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 ENV VIRTUAL_ENV=/opt/venv
 RUN uv venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 RUN export CUTOFF_DATE=$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ') && \
     uv pip install --no-cache --exclude-newer "$CUTOFF_DATE" aider-chat
 
 # ==========================================
-# STAGE 2: Final Agent Sandbox (Lightweight)
+# STAGE 2: Final Agent Sandbox
 # ==========================================
 FROM python:3.12-slim
 
+# 1. Install System Tools & Playwright OS Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates git less nano && \
+    curl ca-certificates git less nano unzip tar openssh-client tree \
+    libgbm1 libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 libpangocairo-1.0-0 \
+    libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxi6 libxrandr2 \
+    libxrender1 libxtst6 libcups2 libxss1 libdbus-glib-1-2 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# 2. Setup User and Copy Python Env
 COPY --from=builder /opt/venv /opt/venv
-
 RUN useradd -m -s /bin/bash agent
+
+# Switch to agent user
 USER agent
 WORKDIR /home/agent
 
-ENV PATH="/home/agent/.local/bin:/home/agent/.opencode/bin:/opt/venv/bin:$PATH"
+# 3. Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
 
-RUN curl -fsSL https://opencode.ai/install | bash
+# 4. Configure PATH 
+# We ensure the agent's bun bin and venv bin are available
+ENV PATH="/home/agent/.local/bin:/home/agent/.bun/bin:/opt/venv/bin:$PATH"
+
+# 5. Symlink so that tools looking for 'node' use 'bun' instead
+RUN ln -s /home/agent/.bun/bin/bun /home/agent/.bun/bin/node
+
+# 6. Install Opencode and Playwright CLI
+RUN bun install -g opencode-ai @playwright/cli
+
+# 7. Install Playwright Browsers
+# not needed. works out of the box anyway
+#ENV PLAYWRIGHT_NO_SANDBOX=1
+RUN playwright-cli install chromium
+
+# 8. Global Git Config
+RUN git config --global user.name "user" && \
+    git config --global user.email "user@local"
+
+# Setup Workspace
+RUN mkdir -p /home/agent/workspace
+WORKDIR /home/agent/workspace
 
 CMD ["/bin/bash"]
