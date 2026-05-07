@@ -47,7 +47,8 @@ RUN bun install -g opencode-ai @playwright/cli
 # 7. Install Playwright Browsers
 # not needed. works out of the box anyway
 #ENV PLAYWRIGHT_NO_SANDBOX=1
-RUN playwright-cli install chromium
+RUN playwright-cli install-browser chromium && \
+    playwright-cli install --skills
 
 # 8. Global Git Config
 RUN git config --global user.name "user" && \

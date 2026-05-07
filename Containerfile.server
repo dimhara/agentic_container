@@ -5,7 +5,7 @@ FROM debian:testing-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git curl ca-certificates \
-    libvulkan-dev glslc python3
+    libvulkan-dev glslc spirv-headers python3
 
 # Build llama.cpp with Vulkan support and install to a staging directory
 WORKDIR /build

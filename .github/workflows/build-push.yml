@@ -9,6 +9,8 @@ env:
   REGISTRY: ghcr.io
   AGENT_IMAGE_NAME: ${{ github.repository_owner }}/agentic-sandbox
   SERVER_IMAGE_NAME: ${{ github.repository_owner }}/llama-vulkan-server
+  # Force Node.js 24 for all actions to satisfy deprecation requirements
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
 jobs:
   build-and-push:
@@ -21,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Lowercase the Image Names
         run: |
