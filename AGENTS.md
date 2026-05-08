@@ -28,8 +28,8 @@ When updating dependencies or build scripts, you must maintain the following sec
    - **CRITICAL:** We enforce a dynamic 7-day release-age constraint during the build step using `uv pip install --exclude-newer "$CUTOFF_DATE"`. 
    - **Do not remove this flag.** If a new package version is requested, wait 7 days.
 
-4. **No Node.js / NPM / Bun / Python C++ Wrappers:**
-   - We **do not** use JavaScript package managers. OpenCode is installed via its standalone bash script (`curl | bash`).
+4. **Avoid having both nodejs and bun. Avoid Python C++ Wrappers:**
+   - We try to use Bun instead of nodejs and npm in a way that is compatible without installing nodejs.
    - We **do not** use `llama-cpp-python`. We rely exclusively on the native C++ `llama-server` binary for inference.
 
 ---
@@ -56,5 +56,5 @@ We use two separate build files:
 - [ ] Did you use `uv` instead of `pip`?
 - [ ] Is the `--exclude-newer` 7-day cutoff still intact?
 - [ ] Is the agent container running as the `agent` user?
-- [ ] Did you avoid introducing `node`, `npm`, or `bun`?
+- [ ] Did you avoid introducing `node`, `npm` alongside `bun`?
 

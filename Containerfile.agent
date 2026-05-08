@@ -7,8 +7,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV VIRTUAL_ENV=/opt/venv
 RUN uv venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-RUN export CUTOFF_DATE=$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ') && \
-    uv pip install --no-cache --exclude-newer "$CUTOFF_DATE" aider-chat
+
+# Expect the cutoff date from the build environment
+ARG CUTOFF_DATE
+RUN uv pip install --no-cache --exclude-newer "$CUTOFF_DATE" aider-chat
 
 # ==========================================
 # STAGE 2: Final Agent Sandbox
@@ -27,35 +29,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 RUN useradd -m -s /bin/bash agent
 
+# 3. Add Initialization Script (Copy as root before switching user)
+COPY agent-init.sh /usr/local/bin/agent-init.sh
+RUN chmod +x /usr/local/bin/agent-init.sh
+
 # Switch to agent user
 USER agent
 WORKDIR /home/agent
 
-# 3. Install Bun
+# 4. Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
 
-# 4. Configure PATH 
-# We ensure the agent's bun bin and venv bin are available
+# 5. Configure PATH 
 ENV PATH="/home/agent/.local/bin:/home/agent/.bun/bin:/opt/venv/bin:$PATH"
 
-# 5. Symlink so that tools looking for 'node' use 'bun' instead
+# 6. Symlink node to bun
 RUN ln -s /home/agent/.bun/bin/bun /home/agent/.bun/bin/node
 
-# 6. Install Opencode and Playwright CLI
+# 7. Install Opencode and Playwright CLI
 RUN bun install -g opencode-ai @playwright/cli
 
-# 7. Install Playwright Browsers
-# not needed. works out of the box anyway
-#ENV PLAYWRIGHT_NO_SANDBOX=1
+# 8. Install Playwright Browsers
 RUN playwright-cli install-browser chromium && \
     playwright-cli install --skills
 
-# 8. Global Git Config
-RUN git config --global user.name "user" && \
-    git config --global user.email "user@local"
+# 9. Set default Environment Variables for Git Configuration
+ENV GIT_USER_NAME="user"
+ENV GIT_USER_EMAIL="user@local"
 
 # Setup Workspace
 RUN mkdir -p /home/agent/workspace
 WORKDIR /home/agent/workspace
 
+# 10. Route startup through the init script
+ENTRYPOINT ["/usr/local/bin/agent-init.sh"]
 CMD ["/bin/bash"]
