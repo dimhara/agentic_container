@@ -30,10 +30,26 @@ podman run -d --rm --name llm-server \
   llama-server -m /models/qwen3.5-moe.gguf --host 0.0.0.0 --port 8080 --jinja
 ```
 
-### 4. Run the Agentic Sandbox (Highly Hostile, No GPU Access)
+### 4. Run the Agentic Sandbox
+Ensure an init.sh exists in your current directory to load keys, aliases and git config.
+
 ```bash
-podman run -it --rm --name agent-sandbox \
+podman run -it --rm --name agent-sandbox -v $(pwd):/home/agent/workspace:U \
   --network ai-net \
   ghcr.io/dimhara/agentic-sandbox:latest
 ```
-*(Note: Git identity and API keys are automatically exported via `agent-init.sh` upon startup).*
+
+Sample init.sh
+
+```bash
+# Git
+git config --global user.name "Alice"
+git config --global user.email "alice@local"
+
+# LLM Keys
+export OPENAI_API_BASE="http://llm-server:8080/v1"
+export OPENAI_API_KEY="sk-no-key-required"
+
+# Aliases
+alias ll="ls -la"
+```
