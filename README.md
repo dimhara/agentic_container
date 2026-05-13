@@ -39,7 +39,10 @@ podman run -it --rm --name agent-sandbox -v $(pwd):/home/agent/workspace:U \
   ghcr.io/dimhara/agentic-sandbox:latest
 ```
 
-Sample init.sh
+The ~agent/.bashrc will source workspace/init.sh  (as well as init_gui.sh in the case of agent_vlc).
+See example under init_examples.
+
+init.sh looks like this:
 
 ```bash
 # Git
