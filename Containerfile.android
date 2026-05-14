@@ -1,0 +1,50 @@
+# ==========================================
+# Specialized Android Development Sandbox
+# ==========================================
+FROM ghcr.io/dimhara/agentic-vnc-sandbox:latest
+
+# 1. Install JDK (Requires root)
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-21-jdk-headless \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2. Switch back to agent for SDK installation
+USER agent
+WORKDIR /home/agent
+
+# Define Android Environment
+ENV ANDROID_HOME=/home/agent/android-sdk
+ENV PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# 3. Download and Verify Android Command Line Tools
+# Version: 14742923
+# SHA1 Verification: 48833c34b761c10cb20bcd16582129395d121b27
+RUN mkdir -p $ANDROID_HOME/cmdline-tools && \
+    curl -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip && \
+    echo "48833c34b761c10cb20bcd16582129395d121b27  cmdline-tools.zip" | sha1sum -c - && \
+    unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools && \
+    rm cmdline-tools.zip && \
+    mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+
+# 4. Install Platform Tools and API Level 36
+# 'yes' is used to accept the licenses automatically
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+
+# 5. Install Gradle under ~/.gradle-install
+ARG GRADLE_VERSION="9.5.1"
+ARG GRADLE_SHA256="bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f"
+RUN mkdir -p /home/agent/.gradle-install && \
+    curl -L -o gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" && \
+    echo "${GRADLE_SHA256}  gradle.zip" | sha256sum -c - && \
+    unzip -q gradle.zip -d /home/agent/.gradle-install && \
+    rm gradle.zip
+
+# Add to PATH
+ENV PATH="/home/agent/.gradle-install/gradle-${GRADLE_VERSION}/bin:$PATH"
+
+# Set default working directory back to workspace
+WORKDIR /home/agent/workspace
+

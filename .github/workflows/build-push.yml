@@ -9,8 +9,8 @@ env:
   REGISTRY: ghcr.io
   AGENT_IMAGE_NAME: ${{ github.repository_owner }}/agentic-sandbox
   VNC_AGENT_IMAGE_NAME: ${{ github.repository_owner }}/agentic-vnc-sandbox
+  ANDROID_IMAGE_NAME: ${{ github.repository_owner }}/agentic-android
   SERVER_IMAGE_NAME: ${{ github.repository_owner }}/llama-vulkan-server
-  # Force Node.js 24 for all actions to satisfy deprecation requirements
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
 
 jobs:
@@ -30,6 +30,7 @@ jobs:
         run: |
           echo "AGENT_IMAGE_NAME=${AGENT_IMAGE_NAME,,}" >> ${GITHUB_ENV}
           echo "VNC_AGENT_IMAGE_NAME=${VNC_AGENT_IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          echo "ANDROID_IMAGE_NAME=${ANDROID_IMAGE_NAME,,}" >> ${GITHUB_ENV}
           echo "SERVER_IMAGE_NAME=${SERVER_IMAGE_NAME,,}" >> ${GITHUB_ENV}
 
       - name: Build Inference Server Image
@@ -39,7 +40,7 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}:${{ github.sha }} \
             -f Containerfile.server .
 
-      - name: Build Base Agent Sandbox Image
+      - name: 1. Build Base Agent Sandbox
         run: |
           CUTOFF_DATE=$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ')
           podman build \
@@ -48,13 +49,19 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.AGENT_IMAGE_NAME }}:${{ github.sha }} \
             -f Containerfile.agent .
 
-      - name: Build VNC Agent Sandbox Image
+      - name: 2. Build VNC Agent Sandbox
         run: |
-          # This automatically uses the Base Agent we just built above from the local Podman cache
           podman build \
             -t ${{ env.REGISTRY }}/${{ env.VNC_AGENT_IMAGE_NAME }}:latest \
             -t ${{ env.REGISTRY }}/${{ env.VNC_AGENT_IMAGE_NAME }}:${{ github.sha }} \
             -f Containerfile.vncagent .
+
+      - name: 3. Build Android Development Sandbox
+        run: |
+          podman build \
+            -t ${{ env.REGISTRY }}/${{ env.ANDROID_IMAGE_NAME }}:latest \
+            -t ${{ env.REGISTRY }}/${{ env.ANDROID_IMAGE_NAME }}:${{ github.sha }} \
+            -f Containerfile.android .
 
       - name: Log in to GitHub Container Registry (GHCR)
         run: |
@@ -62,23 +69,16 @@ jobs:
             -u ${{ github.actor }} \
             -p ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push Images to GHCR
+      - name: Push All Images to GHCR
         run: |
-          # Push Server
-          podman push ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}:latest
-          podman push ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}:${{ github.sha }}
-          
-          # Push Base Agent
-          podman push ${{ env.REGISTRY }}/${{ env.AGENT_IMAGE_NAME }}:latest
-          podman push ${{ env.REGISTRY }}/${{ env.AGENT_IMAGE_NAME }}:${{ github.sha }}
-
-          # Push VNC Agent
-          podman push ${{ env.REGISTRY }}/${{ env.VNC_AGENT_IMAGE_NAME }}:latest
-          podman push ${{ env.REGISTRY }}/${{ env.VNC_AGENT_IMAGE_NAME }}:${{ github.sha }}
+          for IMG in SERVER_IMAGE_NAME AGENT_IMAGE_NAME VNC_AGENT_IMAGE_NAME ANDROID_IMAGE_NAME; do
+            NAME=${!IMG}
+            podman push ${{ env.REGISTRY }}/$NAME:latest
+            podman push ${{ env.REGISTRY }}/$NAME:${{ github.sha }}
+          done
           
       - name: Print resulting image info
         run: |
-          echo "✅ Images successfully built and pushed!"
-          echo "📦 Pull Server: podman pull ${{ env.REGISTRY }}/${{ env.SERVER_IMAGE_NAME }}:latest"
-          echo "📦 Pull Agent (Headless): podman pull ${{ env.REGISTRY }}/${{ env.AGENT_IMAGE_NAME }}:latest"
-          echo "📦 Pull Agent (VNC/UI): podman pull ${{ env.REGISTRY }}/${{ env.VNC_AGENT_IMAGE_NAME }}:latest"
+          echo "✅ All 4 images successfully built and pushed!"
+          echo "📦 Android Sandbox: podman pull ${{ env.REGISTRY }}/${{ env.ANDROID_IMAGE_NAME }}:latest"
+
