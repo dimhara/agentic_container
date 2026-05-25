@@ -1,20 +1,3 @@
-# ==========================================
-# STAGE 1: Builder (Python Dependencies)
-# ==========================================
-FROM python:3.12-slim AS builder
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-ENV VIRTUAL_ENV=/opt/venv
-RUN uv venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Build-arg for cache control
-ARG CUTOFF_DATE
-RUN uv pip install --no-cache --exclude-newer "$CUTOFF_DATE" aider-chat
-
-# ==========================================
-# STAGE 2: Final Agent Sandbox
-# ==========================================
 FROM python:3.12-slim
 
 # 1. Install System Tools & Playwright OS Dependencies
@@ -25,26 +8,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 libxtst6 libcups2 libxss1 libdbus-glib-1-2 pandoc libsixel-bin && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Setup User and Copy Python Env
-COPY --from=builder /opt/venv /opt/venv
+# 2. Create and switch to the agent user
 RUN useradd -m -s /bin/bash agent
-
-# Switch to agent user
 USER agent
 WORKDIR /home/agent
 
-# 3. Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
+# 3. Set Environment Variables
+ENV VIRTUAL_ENV="/home/agent/venv"
+ENV PATH="/home/agent/.local/bin:/home/agent/.bun/bin:${VIRTUAL_ENV}/bin:$PATH"
 
-# 4. Configure PATH 
-ENV PATH="/home/agent/.local/bin:/home/agent/.bun/bin:/opt/venv/bin:$PATH"
-RUN ln -s /home/agent/.bun/bin/bun /home/agent/.bun/bin/node
+# 4. Install uv natively via pip
+RUN pip install --no-cache-dir --user uv
 
-# 5. Install Opencode and Playwright CLI
+# 5. Create VENV and install aider-chat using the 7-Day UV constraint
+ARG CUTOFF_DATE
+RUN uv venv $VIRTUAL_ENV && \
+    uv pip install --no-cache --exclude-newer "$CUTOFF_DATE" aider-chat
+
+# 6. Install Bun & Symlink to Node (Avoids installing full nodejs)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    ln -s /home/agent/.bun/bin/bun /home/agent/.bun/bin/node
+
+# 7. Install Opencode and Playwright Browsers
 RUN bun install -g opencode-ai @playwright/cli
 RUN playwright-cli install-browser chromium && playwright-cli install --skills
 
-# 6. Setup Workspace and automatic init sourcing
+# 8. Setup Workspace and automatic init sourcing
 RUN mkdir -p /home/agent/workspace && \
     echo '[ -f /home/agent/workspace/init.sh ] && . /home/agent/workspace/init.sh' >> /home/agent/.bashrc
 
