@@ -42,7 +42,7 @@ jobs:
 
       - name: 1. Build Base Agent Sandbox
         run: |
-          CUTOFF_DATE=$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ')
+          CUTOFF_DATE=$(date -d '7 days ago' -u +'%F')
           podman build \
             --build-arg CUTOFF_DATE="$CUTOFF_DATE" \
             -t ${{ env.REGISTRY }}/${{ env.AGENT_IMAGE_NAME }}:latest \
