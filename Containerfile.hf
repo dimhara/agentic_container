@@ -1,0 +1,46 @@
+FROM python:3.12-slim
+
+# Build-args
+ARG CUTOFF_DATE
+# Allows switching: 'cpu' (default) or 'rocm7.2' etc
+ARG TARGET_DEVICE=cpu
+
+# ROCm requires libnuma1 at runtime
+RUN apt-get update \
+ && apt-get install -y ffmpeg libsndfile1 ca-certificates curl less nano bat libnuma1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# agent user
+RUN useradd -m -u 1000 agent
+USER agent
+WORKDIR /home/agent
+
+# Disables all telemetry
+ENV DO_NOT_TRACK=1
+ENV HF_HUB_DISABLE_TELEMETRY=1
+ENV PATH="/home/agent/.local/bin:$PATH"
+
+
+# uv setip
+ENV VIRTUAL_ENV="/home/agent/venv"
+ENV PATH="/home/agent/.local/bin:${VIRTUAL_ENV}/bin:$PATH"
+RUN pip install --no-cache-dir --user uv
+
+# Volume
+ENV HF_HOME="/home/agent/hf_cache"
+
+
+# INSTALLATION STEP
+# Install Torch dynamically based on the TARGET_DEVICE ARG with cutoff date
+RUN uv venv $VIRTUAL_ENV && \
+    uv pip -v install --no-cache --torch-backend "$TARGET_DEVICE" --exclude-newer "$CUTOFF_DATE" \
+    torch torchaudio \
+    "transformers>=5.4.0" soundfile librosa
+
+
+RUN mkdir -p /home/agent/workspace && \
+    echo '[ -f /home/agent/workspace/init.sh ] && . /home/agent/workspace/init.sh' >> /home/agent/.bashrc
+
+WORKDIR /home/agent/workspace
+CMD ["/bin/bash"]
+

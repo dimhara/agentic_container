@@ -11,7 +11,8 @@ env:
   VNC_AGENT_IMAGE_NAME: ${{ github.repository_owner }}/agentic-vnc-sandbox
   ANDROID_IMAGE_NAME: ${{ github.repository_owner }}/agentic-android
   SERVER_IMAGE_NAME: ${{ github.repository_owner }}/llama-vulkan-server
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+  HF_IMAGE_NAME: ${{ github.repository_owner }}/hf-base
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push:
@@ -32,6 +33,7 @@ jobs:
           echo "VNC_AGENT_IMAGE_NAME=${VNC_AGENT_IMAGE_NAME,,}" >> ${GITHUB_ENV}
           echo "ANDROID_IMAGE_NAME=${ANDROID_IMAGE_NAME,,}" >> ${GITHUB_ENV}
           echo "SERVER_IMAGE_NAME=${SERVER_IMAGE_NAME,,}" >> ${GITHUB_ENV}
+          echo "HF_IMAGE_NAME=${HF_IMAGE_NAME,,}" >> ${GITHUB_ENV}
 
       - name: Build Inference Server Image
         run: |
@@ -63,6 +65,15 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.ANDROID_IMAGE_NAME }}:${{ github.sha }} \
             -f Containerfile.android .
 
+      - name: Build HF Base Image
+        run: |
+          CUTOFF_DATE=$(date -d '7 days ago' -u +'%F')
+          podman build \
+            --build-arg TARGET_DEVICE="cpu" --build-arg CUTOFF_DATE="$CUTOFF_DATE" \
+            -t ${{ env.REGISTRY }}/${{ env.HF_IMAGE_NAME }}:latest \
+            -t ${{ env.REGISTRY }}/${{ env.HF_IMAGE_NAME }}:${{ github.sha }} \
+            -f Containerfile.hf .
+
       - name: Log in to GitHub Container Registry (GHCR)
         run: |
           podman login ${{ env.REGISTRY }} \
@@ -71,7 +82,7 @@ jobs:
 
       - name: Push All Images to GHCR
         run: |
-          for IMG in SERVER_IMAGE_NAME AGENT_IMAGE_NAME VNC_AGENT_IMAGE_NAME ANDROID_IMAGE_NAME; do
+          for IMG in SERVER_IMAGE_NAME AGENT_IMAGE_NAME VNC_AGENT_IMAGE_NAME ANDROID_IMAGE_NAME HF_IMAGE_NAME; do
             NAME=${!IMG}
             podman push ${{ env.REGISTRY }}/$NAME:latest
             podman push ${{ env.REGISTRY }}/$NAME:${{ github.sha }}
