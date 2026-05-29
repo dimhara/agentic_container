@@ -7,10 +7,10 @@ with GPU access, while the agents run in a stripped-down, completely unprivilege
 podman network create ai-net
 ```
 
-### 2. Build the Agent Sandbox (7-Day UV Constraint)
+### 2. Build the Agent Sandbox (x days UV Constraint)
 To build with a **relative** date (dynamic, invalidates cache):
 ```bash
-podman build --build-arg CUTOFF_DATE="$(date -d '7 days ago' -u +'%Y-%m-%dT%H:%M:%SZ')" \
+podman build --build-arg CUTOFF_DATE="4 days" \
   -t ghcr.io/dimhara/agentic-sandbox:latest -f Containerfile.agent .
 ```
 
