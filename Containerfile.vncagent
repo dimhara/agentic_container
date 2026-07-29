@@ -1,15 +1,18 @@
 # Normal refers to the github actions step from its local cache
 FROM ghcr.io/dimhara/agentic-sandbox:latest
 
+### ROOT stuff ###
+
 USER root
 
 # 1. Install Xvnc, noVNC, and fluxbox
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tigervnc-standalone-server tigervnc-tools \
-    novnc websockify \
-    fluxbox \
+    tigervnc-standalone-server tigervnc-tools novnc websockify fluxbox \
     bat ripgrep fd-find rsync ncdu file \
+    sxiv s-nail iproute2 \
     && rm -rf /var/lib/apt/lists/*
+
+### USER stuff ###
 
 USER agent
 
@@ -20,6 +23,8 @@ RUN mkdir -p ~/.vnc && \
 
 # 3. Add the init_gui.sh sourcing to the inherited .bashrc
 RUN echo '[ -f /home/agent/workspace/init_gui.sh ] && . /home/agent/workspace/init_gui.sh' >> /home/agent/.bashrc
+
+RUN uv pip install --no-cache --exclude-newer "1 week" gradio cryptography
 
 # 4. Expose the noVNC port
 EXPOSE 6080
