@@ -24,7 +24,7 @@ RUN mkdir -p ~/.vnc && \
 # 3. Add the init_gui.sh sourcing to the inherited .bashrc
 RUN echo '[ -f /home/agent/workspace/init_gui.sh ] && . /home/agent/workspace/init_gui.sh' >> /home/agent/.bashrc
 
-RUN uv pip install --no-cache --exclude-newer "1 week" gradio cryptography
+RUN uv pip install --no-cache --exclude-newer "1 week" gradio cryptography python-pptx ddgs
 
 # 4. Expose the noVNC port
 EXPOSE 6080
