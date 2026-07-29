@@ -3,6 +3,8 @@ name: Build and Push Decoupled Agent Sandbox
 on:
   push:
     branches: [ "main" ]
+  schedule:
+    - cron: '0 0 1,15 * *'
   workflow_dispatch:
 
 env:
