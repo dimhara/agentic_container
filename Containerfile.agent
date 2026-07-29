@@ -33,7 +33,10 @@ RUN curl -fsSL https://bun.sh/install | bash && \
 RUN bun install -g opencode-ai @playwright/cli
 RUN playwright-cli install-browser chromium && playwright-cli install --skills
 
-# 8. Setup Workspace and automatic init sourcing
+# 8. Install Pi
+RUN bun add -g --ignore-scripts @earendil-works/pi-coding-agent
+
+# 9. Setup Workspace and automatic init sourcing
 RUN mkdir -p /home/agent/workspace && \
     echo '[ -f /home/agent/workspace/init.sh ] && . /home/agent/workspace/init.sh' >> /home/agent/.bashrc
 
