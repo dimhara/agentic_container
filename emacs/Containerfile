@@ -1,0 +1,66 @@
+## Special container for EMACS with agent support
+FROM debian:testing-slim
+ARG CUTOFF_DATE="1 week"
+
+# basic
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    emacs-pgtk \
+    git curl build-essential ca-certificates \
+    elpa-gptel elpa-eat elpa-markdown-mode \
+    python3 python3-pip \
+    chafa bat fd-find ripgrep 
+
+# extra -- when stable put them above
+RUN apt-get install -y --no-install-recommends \
+   pandoc
+
+# agentic extras. Leave them here.
+RUN apt-get install -y --no-install-recommends \
+   less nano unzip openssh-client tree chafa tmux 
+
+RUN rm -rf /var/lib/apt/lists/*
+
+# Create emacs user
+# -u 1000 ? not needed
+RUN useradd -m -s /bin/bash user
+
+# Pre-create /tmp/run with user ownership and 0700 permissions
+RUN mkdir -m 0700 /tmp/run && chown user:user /tmp/run
+# Create a tool folder owned by user so 'user' can install everything without root
+RUN mkdir -p /opt/tools/bin && chown -R user:user /opt/tools
+
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+############### USERLAND ##########
+
+USER user
+WORKDIR /home/user
+
+
+# Configure user-level paths outside of /home/user so they survive your host mount
+ENV BUN_INSTALL="/opt/tools/bun"
+ENV PLAYWRIGHT_BROWSERS_PATH="/opt/tools/ms-playwright"
+ENV UV_EXCLUDE_NEWER="$CUTOFF_DATE"
+ENV PATH="/opt/tools/bin:/opt/tools/bun/bin:$PATH"
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /home/user/.local/bin/
+
+# Install Bun & Symlink to Node (Avoids installing full nodejs)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    ln -s /opt/tools/bun/bin/bun /opt/tools/bin/node
+
+# Install Playwright Browsers
+RUN bun install --minimum-release-age 7d -g @playwright/cli
+RUN playwright-cli install-browser chromium && playwright-cli install --skills
+
+# 8. Install Pi
+
+
+RUN bun add -g --minimum-release-age 7d --ignore-scripts @earendil-works/pi-coding-agent
+
+
+# 9. Setup Workspace and automatic init sourcing
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["emacs"]
